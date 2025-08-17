@@ -3,6 +3,7 @@ import { useTheme } from './hooks/useTheme';
 import { topicsData, userProfileData } from './data/mockData';
 
 // Components
+import ErrorBoundary from './components/common/ErrorBoundary';
 import Header from './components/common/Header';
 import Sidebar from './components/common/Sidebar';
 import AuthView from './components/auth/AuthView';
@@ -82,7 +83,7 @@ export default function App() {
     };
 
     return (
-        <>
+        <ErrorBoundary fallbackMessage="Sorry, the EduMaster app encountered an unexpected error. Please refresh the page to try again.">
             {!isAuthenticated ? (
                 <AuthView onLogin={handleLogin} />
             ) : (
@@ -109,12 +110,14 @@ export default function App() {
                                 onLogout={handleLogout}
                             />
                             <main className="pt-24 pb-12 px-4 md:px-8 flex-grow">
-                                {renderContent()}
+                                <ErrorBoundary fallbackMessage="Something went wrong in this section. Please try refreshing the page.">
+                                    {renderContent()}
+                                </ErrorBoundary>
                             </main>
                         </div>
                     </div>
                 </div>
             )}
-        </>
+        </ErrorBoundary>
     );
 }

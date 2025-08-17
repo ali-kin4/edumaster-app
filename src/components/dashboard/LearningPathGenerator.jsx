@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Wand2 } from 'lucide-react';
 import Modal from '../common/Modal';
 import { callGemini } from '../../utils/geminiApi';
+import SafeHtml from '../common/SafeHtml';
 
 const LearningPathGenerator = ({ courses }) => {
     const [goal, setGoal] = useState('');
@@ -67,7 +68,7 @@ const LearningPathGenerator = ({ courses }) => {
                         <div className="loader"></div>
                     </div>
                 ) : (
-                    <div dangerouslySetInnerHTML={{ __html: modalContent.body.replace(/\n/g, '<br />') }} />
+                    <SafeHtml content={modalContent.body.replace(/\n/g, '<br />')} />
                 )}
             </Modal>
         </div>

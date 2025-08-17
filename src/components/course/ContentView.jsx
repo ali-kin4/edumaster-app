@@ -4,6 +4,7 @@ import AnimatedGradientText from '../common/AnimatedGradientText';
 import Modal from '../common/Modal';
 import { callGemini } from '../../utils/geminiApi';
 import { courseContentData } from '../../data/mockData';
+import SafeHtml from '../common/SafeHtml';
 import LessonsSection from './LessonsSection';
 import VideoSection from './VideoSection';
 import FlashcardSection from './FlashcardSection';
@@ -121,7 +122,7 @@ const ContentView = ({ topicId, onBack }) => {
                         <div className="loader"></div>
                     </div>
                 ) : (
-                    <div dangerouslySetInnerHTML={{ __html: modalContent.body.replace(/\n/g, '<br />') }} />
+                    <SafeHtml content={modalContent.body.replace(/\n/g, '<br />')} />
                 )}
             </Modal>
         </div>
