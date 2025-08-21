@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTheme } from './hooks/useTheme';
-import { topicsData, userProfileData } from './data/mockData';
+import { topicsData } from './data/mockData';
+import { AuthService } from './services/authService';
 
 // Components
 import ErrorBoundary from './components/common/ErrorBoundary';
@@ -17,7 +18,8 @@ import LearningPathGenerator from './components/dashboard/LearningPathGenerator'
 import TopicsGrid from './components/dashboard/TopicsGrid';
 
 export default function App() {
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
     const [currentView, setCurrentView] = useState('dashboard');
     const [activeTopic, setActiveTopic] = useState(null);
     const [activeFilter, setActiveFilter] = useState('all');
@@ -25,6 +27,27 @@ export default function App() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const { theme, setTheme } = useTheme();
+
+    useEffect(() => {
+        const checkUser = async () => {
+            const { user } = await AuthService.getUserWithProfile();
+            setUser(user);
+            setLoading(false);
+        };
+
+        checkUser();
+
+        const { data: authListener } = AuthService.onAuthStateChange((_event, session) => {
+            const user = session?.user;
+            AuthService.getUserWithProfile().then(({ user }) => {
+                setUser(user);
+            });
+        });
+
+        return () => {
+            authListener?.unsubscribe();
+        };
+    }, []);
 
     const filteredTopics = topicsData
         .filter(topic => activeFilter === 'all' || topic.category === activeFilter)
@@ -55,8 +78,15 @@ export default function App() {
         setCurrentView('dashboard');
     };
     
-    const handleLogin = () => setIsAuthenticated(true);
-    const handleLogout = () => setIsAuthenticated(false);
+    const handleLogin = async () => {
+        const { user } = await AuthService.getUserWithProfile();
+        setUser(user);
+    };
+    
+    const handleLogout = async () => {
+        await AuthService.signOut();
+        setUser(null);
+    };
 
     const renderContent = () => {
         switch (currentView) {
@@ -74,7 +104,7 @@ export default function App() {
             default:
                 return (
                     <>
-                        <DashboardHeader name={userProfileData.name.split(' ')[0]} />
+                        <DashboardHeader name={user?.profile?.full_name.split(' ')[0] || 'Guest'} />
                         <LearningPathGenerator courses={topicsData} />
                         <TopicsGrid topics={filteredTopics} onSelectTopic={handleSelectTopic} />
                     </>
@@ -82,9 +112,17 @@ export default function App() {
         }
     };
 
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="loader"></div>
+            </div>
+        );
+    }
+
     return (
         <ErrorBoundary fallbackMessage="Sorry, the EduMaster app encountered an unexpected error. Please refresh the page to try again.">
-            {!isAuthenticated ? (
+            {!user ? (
                 <AuthView onLogin={handleLogin} />
             ) : (
                 <div className="bg-background min-h-screen font-sans">
@@ -106,7 +144,7 @@ export default function App() {
                                 searchTerm={searchTerm}
                                 onSearchChange={(e) => setSearchTerm(e.target.value)}
                                 isSidebarCollapsed={isSidebarCollapsed}
-                                user={userProfileData}
+                                user={user.profile}
                                 onLogout={handleLogout}
                             />
                             <main className="pt-24 pb-12 px-4 md:px-8 flex-grow">
