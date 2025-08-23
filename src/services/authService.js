@@ -183,6 +183,13 @@ export class AuthService {
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
+        options: {
+          redirectTo: window.location.origin,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        }
       });
 
       if (error) throw error;
@@ -190,6 +197,184 @@ export class AuthService {
       return { user: data.user, session: data.session, error: null };
     } catch (error) {
       console.error('Sign in with Google error:', error);
+      return { user: null, session: null, error };
+    }
+  }
+
+  /**
+   * Check if OAuth callback has completed and user is authenticated
+   * @returns {Promise<{user: object, error: object}>}
+   */
+  static async checkOAuthCompletion() {
+    try {
+      // Wait a bit for Supabase to process
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Check if we have a session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        return { user: null, error: sessionError };
+      }
+      
+      if (session?.user) {
+        return { user: session.user, error: null };
+      }
+      
+      // Check if we have a user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        return { user: null, error: new Error('No authenticated user found') };
+      }
+      
+      return { user, error: null };
+      
+    } catch (error) {
+      return { user: null, error };
+    }
+  }
+
+  /**
+   * Manually process OAuth callback from current URL
+   * @returns {Promise<{user: object, session: object, error: object}>}
+   */
+  static async processOAuthCallback() {
+    try {
+      console.log('AuthService: Manually processing OAuth callback...');
+      
+      // Check if we have OAuth parameters
+      if (!this.isOAuthCallback()) {
+        return { user: null, session: null, error: new Error('No OAuth callback parameters found') };
+      }
+      
+      // Wait a bit for Supabase to process
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Try to get the session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('AuthService: Session error:', sessionError);
+        throw sessionError;
+      }
+      
+      if (session?.user) {
+        console.log('AuthService: User found in session:', session.user.email);
+        return { user: session.user, session, error: null };
+      }
+      
+      // Try to get user directly
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error('No user found after OAuth callback');
+      }
+      
+      console.log('AuthService: User found directly:', user.email);
+      return { user, session: null, error: null };
+      
+    } catch (error) {
+      console.error('AuthService: Error processing OAuth callback:', error);
+      return { user: null, session: null, error };
+    }
+  }
+
+  /**
+   * Clear OAuth callback parameters from URL
+   */
+  static clearOAuthCallback() {
+    // Remove hash parameters
+    if (window.location.hash.includes('access_token') || window.location.hash.includes('refresh_token')) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+    
+    // Remove search parameters
+    if (window.location.search.includes('code=')) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }
+
+  /**
+   * Check if current URL contains OAuth callback parameters
+   * @returns {boolean}
+   */
+  static isOAuthCallback() {
+    return window.location.hash.includes('access_token') || 
+           window.location.hash.includes('refresh_token') ||
+           window.location.search.includes('code=');
+  }
+
+  /**
+   * Handle OAuth callback and get user session
+   * @returns {Promise<{user: object, session: object, error: object}>}
+   */
+  static async handleOAuthCallback() {
+    try {
+      console.log('AuthService: Starting OAuth callback handling...');
+      
+      // Get the current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      console.log('AuthService: Session check result:', { 
+        hasSession: !!session, 
+        hasUser: !!session?.user, 
+        error: sessionError?.message 
+      });
+      
+      if (sessionError) throw sessionError;
+
+      if (session?.user) {
+        console.log('AuthService: User found in session:', session.user.email);
+        
+        // Create user profile if it doesn't exist
+        try {
+          await this.createUserProfile(session.user.id, {
+            email: session.user.email,
+            full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || 'User',
+            role: 'student',
+          });
+          console.log('AuthService: User profile created/updated successfully');
+        } catch (profileError) {
+          // Profile might already exist, which is fine
+          console.log('AuthService: Profile creation skipped:', profileError.message);
+        }
+
+        return { user: session.user, session, error: null };
+      }
+
+      console.log('AuthService: No session, trying to get user directly...');
+      
+      // Try to get user directly
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      console.log('AuthService: Direct user check result:', { 
+        hasUser: !!user, 
+        error: userError?.message 
+      });
+      
+      if (userError || !user) {
+        return { user: null, session: null, error: new Error('No user found') };
+      }
+
+      console.log('AuthService: User found directly:', user.email);
+      
+      // Create user profile if it doesn't exist
+      try {
+        await this.createUserProfile(user.id, {
+          email: user.email,
+          full_name: user.user_metadata?.full_name || user.user_metadata?.name || 'User',
+          role: 'student',
+        });
+        console.log('AuthService: User profile created/updated successfully');
+      } catch (profileError) {
+        // Profile might already exist, which is fine
+        console.log('AuthService: Profile creation skipped:', profileError.message);
+      }
+
+      return { user, session: null, error: null };
+    } catch (error) {
+      console.error('AuthService: OAuth callback error:', error);
       return { user: null, session: null, error };
     }
   }

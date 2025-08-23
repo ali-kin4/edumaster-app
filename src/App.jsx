@@ -8,6 +8,7 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 import Header from './components/common/Header';
 import Sidebar from './components/common/Sidebar';
 import AuthView from './components/auth/AuthView';
+import AuthCallback from './components/auth/AuthCallback';
 import ContentView from './components/course/ContentView';
 import ProfileView from './components/profile/ProfileView';
 import ProgressView from './components/profile/ProgressView';
@@ -26,9 +27,29 @@ export default function App() {
     const [searchTerm, setSearchTerm] = useState('');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+    const [isAuthCallback, setIsAuthCallback] = useState(false);
     const { theme, setTheme } = useTheme();
 
     useEffect(() => {
+        // Check if we're in an auth callback
+        const isCallback = window.location.pathname === '/auth/callback' || 
+                          AuthService.isOAuthCallback();
+        
+        console.log('App: Checking auth callback state:', {
+            pathname: window.location.pathname,
+            hash: window.location.hash,
+            search: window.location.search,
+            isCallback,
+            isOAuthCallback: AuthService.isOAuthCallback()
+        });
+        
+        if (isCallback) {
+            console.log('App: Setting auth callback mode');
+            setIsAuthCallback(true);
+            setLoading(false);
+            return;
+        }
+
         const checkUser = async () => {
             const { user } = await AuthService.getUserWithProfile();
             setUser(user);
@@ -48,6 +69,25 @@ export default function App() {
             authListener?.unsubscribe();
         };
     }, []);
+
+    const handleAuthSuccess = async () => {
+        try {
+            console.log('App: Handling auth success...');
+            const { user, error } = await AuthService.checkOAuthCompletion();
+            if (error) {
+                console.error('Error handling auth success:', error);
+                return;
+            }
+            console.log('App: Auth success, setting user:', user.email);
+            setUser(user);
+            setIsAuthCallback(false);
+            // Clear the OAuth callback parameters from URL
+            AuthService.clearOAuthCallback();
+            console.log('App: Auth callback completed successfully');
+        } catch (error) {
+            console.error('Error handling auth success:', error);
+        }
+    };
 
     const filteredTopics = topicsData
         .filter(topic => activeFilter === 'all' || topic.category === activeFilter)
@@ -117,6 +157,15 @@ export default function App() {
             <div className="flex items-center justify-center min-h-screen">
                 <div className="loader"></div>
             </div>
+        );
+    }
+
+    // Handle auth callback
+    if (isAuthCallback) {
+        return (
+            <ErrorBoundary fallbackMessage="Sorry, the authentication callback encountered an error. Please try logging in again.">
+                <AuthCallback onAuthSuccess={handleAuthSuccess} />
+            </ErrorBoundary>
         );
     }
 
