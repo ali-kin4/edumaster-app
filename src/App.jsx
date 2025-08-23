@@ -73,7 +73,7 @@ export default function App() {
     const handleAuthSuccess = async () => {
         try {
             console.log('App: Handling auth success...');
-            const { user, error } = await AuthService.checkOAuthCompletion();
+            const { user, error } = await AuthService.waitForOAuthProcessing();
             if (error) {
                 console.error('Error handling auth success:', error);
                 return;

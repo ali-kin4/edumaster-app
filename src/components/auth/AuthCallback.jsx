@@ -11,14 +11,13 @@ const AuthCallback = ({ onAuthSuccess }) => {
       try {
         console.log('Starting OAuth callback handling... (attempt:', retryCount + 1, ')');
         console.log('Current URL hash:', window.location.hash);
-        
-        // Wait a bit for Supabase to process the OAuth callback
-        await new Promise(resolve => setTimeout(resolve, 1500 + (retryCount * 500)));
+        console.log('Current URL search:', window.location.search);
+        console.log('OAuth flow type:', window.location.search.includes('code=') ? 'Authorization Code' : 'Hash Fragment');
         
         console.log('Processing OAuth callback...');
         
         // Use the AuthService to handle the OAuth callback
-        const { user, error } = await AuthService.checkOAuthCompletion();
+        const { user, error } = await AuthService.waitForOAuthProcessing();
         
         console.log('OAuth callback result:', { user: !!user, error });
         

@@ -202,22 +202,101 @@ export class AuthService {
   }
 
   /**
+   * Wait for Supabase to process OAuth callback and exchange authorization code
+   * @returns {Promise<{user: object, error: object}>}
+   */
+  static async waitForOAuthProcessing() {
+    try {
+      console.log('AuthService: Waiting for OAuth processing...');
+      
+      // Check if we have an authorization code
+      const hasAuthCode = window.location.search.includes('code=');
+      
+      if (hasAuthCode) {
+        console.log('AuthService: Authorization code detected, waiting for token exchange...');
+        
+        // Wait for Supabase to exchange the code for tokens
+        // This can take a few seconds
+        for (let attempt = 1; attempt <= 5; attempt++) {
+          console.log(`AuthService: Attempt ${attempt}/5 to get user session...`);
+          
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+          
+          if (sessionError) {
+            console.error('AuthService: Session error on attempt', attempt, ':', sessionError);
+            continue;
+          }
+          
+          if (session?.user) {
+            console.log('AuthService: User session found on attempt', attempt);
+            return { user: session.user, error: null };
+          }
+          
+          // Try to get user directly
+          const { data: { user }, error: userError } = await supabase.auth.getUser();
+          
+          if (!userError && user) {
+            console.log('AuthService: User found directly on attempt', attempt);
+            return { user, error: null };
+          }
+        }
+        
+        throw new Error('OAuth processing timeout - no user session found after 5 attempts');
+      }
+      
+      // For hash-based flow, use shorter wait
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw sessionError;
+      }
+      
+      if (session?.user) {
+        return { user: session.user, error: null };
+      }
+      
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error('No authenticated user found');
+      }
+      
+      return { user, error: null };
+      
+    } catch (error) {
+      console.error('AuthService: Error waiting for OAuth processing:', error);
+      return { user: null, error };
+    }
+  }
+
+  /**
    * Check if OAuth callback has completed and user is authenticated
    * @returns {Promise<{user: object, error: object}>}
    */
   static async checkOAuthCompletion() {
     try {
-      // Wait a bit for Supabase to process
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('AuthService: Checking OAuth completion...');
+      console.log('AuthService: Current URL search:', window.location.search);
+      console.log('AuthService: Current URL hash:', window.location.hash);
+      
+      // Wait longer for authorization code flow to complete
+      const waitTime = window.location.search.includes('code=') ? 3000 : 1000;
+      await new Promise(resolve => setTimeout(resolve, waitTime));
       
       // Check if we have a session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) {
+        console.error('AuthService: Session error:', sessionError);
         return { user: null, error: sessionError };
       }
       
       if (session?.user) {
+        console.log('AuthService: User found in session:', session.user.email);
         return { user: session.user, error: null };
       }
       
@@ -228,9 +307,11 @@ export class AuthService {
         return { user: null, error: new Error('No authenticated user found') };
       }
       
+      console.log('AuthService: User found directly:', user.email);
       return { user, error: null };
       
     } catch (error) {
+      console.error('AuthService: Error checking OAuth completion:', error);
       return { user: null, error };
     }
   }
@@ -242,14 +323,18 @@ export class AuthService {
   static async processOAuthCallback() {
     try {
       console.log('AuthService: Manually processing OAuth callback...');
+      console.log('AuthService: Current URL search:', window.location.search);
+      console.log('AuthService: Current URL hash:', window.location.hash);
       
       // Check if we have OAuth parameters
       if (!this.isOAuthCallback()) {
         return { user: null, session: null, error: new Error('No OAuth callback parameters found') };
       }
       
-      // Wait a bit for Supabase to process
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait longer for authorization code flow to complete
+      const waitTime = window.location.search.includes('code=') ? 4000 : 2000;
+      console.log(`AuthService: Waiting ${waitTime}ms for OAuth processing...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
       
       // Try to get the session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -289,8 +374,8 @@ export class AuthService {
       window.history.replaceState(null, '', window.location.pathname);
     }
     
-    // Remove search parameters
-    if (window.location.search.includes('code=')) {
+    // Remove search parameters (code, state, etc.)
+    if (window.location.search.includes('code=') || window.location.search.includes('state=')) {
       window.history.replaceState(null, '', window.location.pathname);
     }
   }
@@ -302,7 +387,8 @@ export class AuthService {
   static isOAuthCallback() {
     return window.location.hash.includes('access_token') || 
            window.location.hash.includes('refresh_token') ||
-           window.location.search.includes('code=');
+           window.location.search.includes('code=') ||
+           window.location.search.includes('state=');
   }
 
   /**
