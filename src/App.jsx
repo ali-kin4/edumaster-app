@@ -29,9 +29,36 @@ export default function App() {
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [isAuthCallback, setIsAuthCallback] = useState(false);
     const [error, setError] = useState(null);
+    const [errorDetails, setErrorDetails] = useState(null);
     const { theme, setTheme } = useTheme();
 
+    // Global error handler
     useEffect(() => {
+        const handleError = (event) => {
+            console.error('App: Global error caught:', event.error);
+            setError('An unexpected error occurred');
+            setErrorDetails(event.error);
+        };
+
+        const handleUnhandledRejection = (event) => {
+            console.error('App: Unhandled promise rejection:', event.reason);
+            setError('An unexpected error occurred');
+            setErrorDetails(event.reason);
+        };
+
+        window.addEventListener('error', handleError);
+        window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+        return () => {
+            window.removeEventListener('error', handleError);
+            window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+        };
+    }, []);
+
+    useEffect(() => {
+        // Debug OAuth state
+        const debugInfo = AuthService.debugOAuthState();
+        
         // Check if we're in an auth callback
         const isCallback = window.location.pathname === '/auth/callback' || 
                           AuthService.isOAuthCallback();
@@ -41,7 +68,9 @@ export default function App() {
             hash: window.location.hash,
             search: window.location.search,
             isCallback,
-            isOAuthCallback: AuthService.isOAuthCallback()
+            isOAuthCallback: AuthService.isOAuthCallback(),
+            currentUrl: window.location.href,
+            debugInfo
         });
         
         if (isCallback) {
@@ -52,9 +81,14 @@ export default function App() {
         }
 
         const checkUser = async () => {
-            const { user } = await AuthService.getUserWithProfile();
-            setUser(user);
-            setLoading(false);
+            try {
+                const { user } = await AuthService.getUserWithProfile();
+                setUser(user);
+                setLoading(false);
+            } catch (error) {
+                console.error('App: Error checking user:', error);
+                setLoading(false);
+            }
         };
 
         checkUser();
@@ -63,6 +97,8 @@ export default function App() {
             const user = session?.user;
             AuthService.getUserWithProfile().then(({ user }) => {
                 setUser(user);
+            }).catch(error => {
+                console.error('App: Error in auth state change:', error);
             });
         });
 
@@ -170,15 +206,35 @@ export default function App() {
                         <p className="font-semibold">Authentication Error</p>
                         <p>{error}</p>
                     </div>
-                    <button 
-                        onClick={() => {
-                            setError(null);
-                            setIsAuthCallback(false);
-                        }}
-                        className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors"
-                    >
-                        Try Again
-                    </button>
+                    
+                    {errorDetails && (
+                        <details className="mt-4 text-left max-w-md mx-auto">
+                            <summary className="cursor-pointer text-text-tertiary">Error Details</summary>
+                            <pre className="text-xs bg-gray-100 p-2 rounded mt-2 overflow-auto">
+                                {errorDetails.toString()}
+                            </pre>
+                        </details>
+                    )}
+                    
+                    <div className="space-y-3 mt-4">
+                        <button 
+                            onClick={() => {
+                                setError(null);
+                                setErrorDetails(null);
+                                setIsAuthCallback(false);
+                            }}
+                            className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors"
+                        >
+                            Try Again
+                        </button>
+                        
+                        <button 
+                            onClick={() => window.location.reload()}
+                            className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors ml-2"
+                        >
+                            Refresh Page
+                        </button>
+                    </div>
                 </div>
             </div>
         );

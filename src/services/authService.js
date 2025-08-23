@@ -408,6 +408,31 @@ export class AuthService {
   }
 
   /**
+   * Debug OAuth callback state and environment
+   * @returns {object} Debug information
+   */
+  static debugOAuthState() {
+    const debug = {
+      currentUrl: window.location.href,
+      hostname: window.location.hostname,
+      pathname: window.location.pathname,
+      search: window.location.search,
+      hash: window.location.hash,
+      isLocalhost: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1',
+      isProduction: window.location.hostname.includes('vercel.app'),
+      hasAuthCode: window.location.search.includes('code='),
+      hasState: window.location.search.includes('state='),
+      hasAccessToken: window.location.hash.includes('access_token'),
+      hasRefreshToken: window.location.hash.includes('refresh_token'),
+      userAgent: navigator.userAgent,
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log('AuthService: OAuth Debug Info:', debug);
+    return debug;
+  }
+
+  /**
    * Check if current URL contains OAuth callback parameters
    * @returns {boolean}
    */
