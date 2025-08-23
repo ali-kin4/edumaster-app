@@ -196,7 +196,13 @@ export class AuthService {
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
+            hd: 'gmail.com', // Optional: restrict to specific domain
           },
+          // Custom branding
+          branding: {
+            name: 'EduMaster Pro',
+            logo: 'https://edumaster-app.vercel.app/favicon.svg'
+          }
         }
       });
 
