@@ -216,6 +216,8 @@ export class AuthService {
   static async waitForOAuthProcessing() {
     try {
       console.log('AuthService: Waiting for OAuth processing...');
+      console.log('AuthService: Current URL:', window.location.href);
+      console.log('AuthService: Environment:', window.location.hostname === 'localhost' ? 'Development' : 'Production');
       
       // Check if we have an authorization code
       const hasAuthCode = window.location.search.includes('code=');
@@ -230,24 +232,29 @@ export class AuthService {
           
           await new Promise(resolve => setTimeout(resolve, 1000));
           
-          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-          
-          if (sessionError) {
-            console.error('AuthService: Session error on attempt', attempt, ':', sessionError);
+          try {
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            
+            if (sessionError) {
+              console.error('AuthService: Session error on attempt', attempt, ':', sessionError);
+              continue;
+            }
+            
+            if (session?.user) {
+              console.log('AuthService: User session found on attempt', attempt);
+              return { user: session.user, error: null };
+            }
+            
+            // Try to get user directly
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            
+            if (!userError && user) {
+              console.log('AuthService: User found directly on attempt', attempt);
+              return { user, error: null };
+            }
+          } catch (attemptError) {
+            console.error('AuthService: Error on attempt', attempt, ':', attemptError);
             continue;
-          }
-          
-          if (session?.user) {
-            console.log('AuthService: User session found on attempt', attempt);
-            return { user: session.user, error: null };
-          }
-          
-          // Try to get user directly
-          const { data: { user }, error: userError } = await supabase.auth.getUser();
-          
-          if (!userError && user) {
-            console.log('AuthService: User found directly on attempt', attempt);
-            return { user, error: null };
           }
         }
         
@@ -255,25 +262,31 @@ export class AuthService {
       }
       
       // For hash-based flow, use shorter wait
+      console.log('AuthService: Hash-based flow detected, waiting...');
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        throw sessionError;
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          throw sessionError;
+        }
+        
+        if (session?.user) {
+          return { user: session.user, error: null };
+        }
+        
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError || !user) {
+          throw new Error('No authenticated user found');
+        }
+        
+        return { user, error: null };
+      } catch (flowError) {
+        console.error('AuthService: Hash flow error:', flowError);
+        throw flowError;
       }
-      
-      if (session?.user) {
-        return { user: session.user, error: null };
-      }
-      
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError || !user) {
-        throw new Error('No authenticated user found');
-      }
-      
-      return { user, error: null };
       
     } catch (error) {
       console.error('AuthService: Error waiting for OAuth processing:', error);

@@ -5,14 +5,20 @@ const AuthCallback = ({ onAuthSuccess }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [debugInfo, setDebugInfo] = useState('');
 
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        console.log('Starting OAuth callback handling... (attempt:', retryCount + 1, ')');
-        console.log('Current URL hash:', window.location.hash);
-        console.log('Current URL search:', window.location.search);
-        console.log('OAuth flow type:', window.location.search.includes('code=') ? 'Authorization Code' : 'Hash Fragment');
+        const debugMsg = `Starting OAuth callback handling... (attempt: ${retryCount + 1})
+Current URL: ${window.location.href}
+Hash: ${window.location.hash}
+Search: ${window.location.search}
+User Agent: ${navigator.userAgent}
+Environment: ${window.location.hostname === 'localhost' ? 'Development' : 'Production'}`;
+        
+        console.log(debugMsg);
+        setDebugInfo(debugMsg);
         
         console.log('Processing OAuth callback...');
         
@@ -79,6 +85,14 @@ const AuthCallback = ({ onAuthSuccess }) => {
             Please wait while we set up your account...
             {retryCount > 0 && <span className="block mt-1">Retrying... (attempt {retryCount + 1}/3)</span>}
           </p>
+          {debugInfo && (
+            <details className="mt-4 text-left max-w-md mx-auto">
+              <summary className="cursor-pointer text-text-tertiary">Debug Info</summary>
+              <pre className="text-xs bg-gray-100 p-2 rounded mt-2 overflow-auto">
+                {debugInfo}
+              </pre>
+            </details>
+          )}
         </div>
       </div>
     );
@@ -92,9 +106,17 @@ const AuthCallback = ({ onAuthSuccess }) => {
             <p className="font-semibold">Authentication Error</p>
             <p>{error}</p>
           </div>
+          {debugInfo && (
+            <details className="mt-4 text-left max-w-md mx-auto">
+              <summary className="cursor-pointer text-text-tertiary">Debug Info</summary>
+              <pre className="text-xs bg-gray-100 p-2 rounded mt-2 overflow-auto">
+                {debugInfo}
+              </pre>
+            </details>
+          )}
           <button 
             onClick={() => window.location.href = '/'}
-            className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors"
+            className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors mt-4"
           >
             Return to Login
           </button>

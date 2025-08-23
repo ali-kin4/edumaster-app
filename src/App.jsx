@@ -28,6 +28,7 @@ export default function App() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [isAuthCallback, setIsAuthCallback] = useState(false);
+    const [error, setError] = useState(null);
     const { theme, setTheme } = useTheme();
 
     useEffect(() => {
@@ -160,11 +161,38 @@ export default function App() {
         );
     }
 
+    // Show error if OAuth callback failed
+    if (error) {
+        return (
+            <div className="min-h-screen w-full flex items-center justify-center bg-background">
+                <div className="text-center">
+                    <div className="bg-red-500 text-white p-4 rounded-lg mb-4">
+                        <p className="font-semibold">Authentication Error</p>
+                        <p>{error}</p>
+                    </div>
+                    <button 
+                        onClick={() => {
+                            setError(null);
+                            setIsAuthCallback(false);
+                        }}
+                        className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors"
+                    >
+                        Try Again
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     // Handle auth callback
     if (isAuthCallback) {
         return (
             <ErrorBoundary fallbackMessage="Sorry, the authentication callback encountered an error. Please try logging in again.">
-                <AuthCallback onAuthSuccess={handleAuthSuccess} />
+                <AuthCallback onAuthSuccess={handleAuthSuccess} onError={(error) => {
+                    console.error('App: Auth callback error:', error);
+                    setError(error);
+                    setIsAuthCallback(false);
+                }} />
             </ErrorBoundary>
         );
     }
